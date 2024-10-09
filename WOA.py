@@ -71,7 +71,7 @@ def SortPosition(x, index):
         xnew[i, :] = x[index[i], :]
     return xnew
 
-def WOA(pop, dim, lb, ub, MaxIter, fun):
+def WOA(pop, inputnum, hiddennum, outputnum, lb, ub, MaxIter, fun):
     '''
     鲸鱼优化算法
     
@@ -86,6 +86,9 @@ def WOA(pop, dim, lb, ub, MaxIter, fun):
     GbestPosition:最优解
     Curve:迭代曲线
     '''
+    
+    dim = inputnum * hiddennum + hiddennum +hiddennum*outputnum + outputnum
+    
     x = initialization(pop, ub, lb, dim)
     fitness = CaculateFitness(x, fun)
     fitness, sortIndex = SortFitness(fitness)
