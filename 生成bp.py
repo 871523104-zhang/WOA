@@ -111,6 +111,9 @@ def WOA(net, X, Y, pop_size=20, max_iter=50):
 
 # 主函数
 if __name__ == "__main__":   
+    # 保存模型路径
+    path = 'WOA1.pth'
+    
     X = pd.read_excel('features.xlsx').values
     Y = pd.read_excel('labels.xlsx').values
     
@@ -124,10 +127,12 @@ if __name__ == "__main__":
     net = Net()
 
     # 使用鲸鱼优化算法优化网络参数
-    best_params, bestScoreHistory = WOA(net, x_train, y_train, pop_size=30, max_iter=500)
+    best_params, bestScoreHistory = WOA(net, x_train, y_train, pop_size=30, max_iter=50)
 
     # 将最优参数设置到网络中
     set_network_params(net, best_params)
+    # 保存模型权重
+    torch.save(net.state_dict(), path)
 
     # 测试网络
     with torch.no_grad():
