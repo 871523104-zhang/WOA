@@ -2,15 +2,16 @@ import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
+from openpyxl import Workbook
 from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
 # 使用maxabsscaler区别不大，失去缩放的目的
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
 # 定义BP神经网络
-class Net(nn.Module):
+class BPNet(nn.Module):
     def __init__(self):
-        super(Net, self).__init__()
+        super(BPNet, self).__init__()
         self.fc1 = nn.Linear(5, 23)  # 5个输入，10个隐藏神经元
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(23, 1)  # 1个输出
@@ -103,7 +104,7 @@ def WOA(net, X, Y, pop_size=20, max_iter=50):
             best_score = fitness[current_best_idx]
             best_whale = population[current_best_idx].copy()
 
-        print(f"迭代 {t+1}/{max_iter}, 最佳适应度: {best_score}")
+        # print(f"迭代 {t+1}/{max_iter}, 最佳适应度: {best_score}")
         bestScoreHistory.append(best_score)
 
     # 返回最优解
@@ -112,51 +113,86 @@ def WOA(net, X, Y, pop_size=20, max_iter=50):
 # 主函数
 if __name__ == "__main__":   
     # 保存模型路径
-    path = 'WOA1.pth'
+    testRatio = 0.2
+    popSize = 30
+    maxIter = 100
     
     X = pd.read_excel('features.xlsx').values
     Y = pd.read_excel('labels.xlsx').values
     
+    # 获取x和y的数据特征（最大最小值，均值等）作为归一化依据
+    # x和y分别有不同的归一化特征
     scalerx = MinMaxScaler().fit(X)
     scalery = MinMaxScaler().fit(Y)
     x_m = scalerx.transform(X)
     y_m = scalery.transform(Y)
-    x_train, x_test, y_train, y_test = train_test_split(x_m, y_m, test_size=0.01)
+    # train和test占比
+    # 导出拟合图像时：这里由于数据基数大，为得出图像容易看，所以将比例设定很小
+    # 导出数据统计图像时：可适当增加test比例使其为8:2
+    x_train, x_test, y_train, y_test = train_test_split(x_m, y_m, test_size=testRatio)
 
-    # 初始化网络
-    net = Net()
-
-    # 使用鲸鱼优化算法优化网络参数
-    best_params, bestScoreHistory = WOA(net, x_train, y_train, pop_size=30, max_iter=50)
-
-    # 将最优参数设置到网络中
-    set_network_params(net, best_params)
-    # 保存模型权重
-    torch.save(net.state_dict(), path)
-
-    # 测试网络
-    with torch.no_grad():
-        test_input = torch.from_numpy(x_test).float()
-        test_output = net(test_input)
-        y_predict = scalery.inverse_transform(test_output)
-        y_test = scalery.inverse_transform(y_test)
+    bestScoreTotal = []
+    testLossTotal = []
+    wb = Workbook()
+    for i in range(30):
+        # 初始化网络
+        net = BPNet()
+        # 使用鲸鱼优化算法优化网络参数
+        # max_iter：运行轮数
+        # pop_size：优化过程中考虑的候选解的数量
+        # best_params：性能最好的神经网络参数
+        # bestScoreHistory：记录了每次迭代中全局最优解的适应度，可以用来分析算法的性能和收敛情况
+        best_params, bestScoreHistory = WOA(net, x_train, y_train, pop_size=popSize, max_iter=maxIter)
+        iterations = range(1, len(bestScoreHistory)+1)
+        lastScore = bestScoreHistory[-1]
+        bestScoreTotal.append(lastScore)
+        # plt.figure(figsize=(10,5))
+        # # 绘制bestscorehistory
+        # plt.plot(iterations, bestScoreHistory)
+        # plt.title('BsetScoreHistory')
+        # plt.xlabel('iteration')
+        # plt.ylabel('Best Score')
+        # plt.grid(True)
+        # plt.legend(['best score'])
+        # plt.show()
         
-        loss_fn = nn.MSELoss()
-        loss = loss_fn(torch.from_numpy(y_predict).float(), torch.from_numpy(y_test).float())
-        print(f"最终测试损失: {loss.item()}")
-        # 最佳适应度
-        plt.figure()
-        plt.plot(bestScoreHistory, label='fitness')
-        plt.show()
-        # 折线图
-        plt.plot(y_test, label='actual')
-        plt.plot(y_predict, label='predict')
-        plt.legend()
-        plt.show()
-        # 散点图
-        plt.scatter(y_test, y_predict)
-        plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'k--')
-        plt.xlabel('actual')
-        plt.ylabel('predict')
-        plt.show()
+        path = f'头部混沌变异\\初始无映射\\WOAHeadTent{i}.pth'
+        # 将最优参数设置到网络中
+        set_network_params(net, best_params)
+        # 保存模型权重
+        torch.save(net.state_dict(), path)
+
+        # 测试网络
+        with torch.no_grad():
+            test_input = torch.from_numpy(x_test).float()
+            test_output = net(test_input)
+            y_predict = scalery.inverse_transform(test_output)
+            y_test = scalery.inverse_transform(y_test)
+            
+            loss_fn = nn.MSELoss()
+            loss = loss_fn(torch.from_numpy(y_predict).float(), torch.from_numpy(y_test).float())
+            print(f"最终测试损失: {loss.item()}")
+            testLossTotal.append(loss.item())
+            
+        print(f'*****第{i+1}次训练完成*****')
+        
+    # 将total结果存储到excel中
+    total = [bestScoreTotal, testLossTotal]
+    df = pd.DataFrame(total, index=['bestscore', 'Loss'])
+    df.to_excel('头部混沌变异\\初始无映射\\total.xlsx')
+    #     # 最佳适应度
+    #     plt.figure()
+    #     plt.plot(bestScoreHistory, label='fitness')
+    #     plt.show()
+    #     # 折线图
+    #     plt.plot(y_test, label='actual')
+    #     plt.plot(y_predict, label='predict')
+    #     plt.legend()
+    #     plt.show()
+    #     # 散点图
+    #     plt.scatter(y_test, y_predict)
+    #     plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'k--')
+    #     plt.xlabel('actual')
+    #     plt.ylabel('predict')
+    #     plt.show()
         
