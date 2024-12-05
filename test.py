@@ -7,7 +7,7 @@ from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
-from 生成bp import BPNet
+from 头部混沌变异.初始无映射.初始无映射 import BPNet
 
 # 使用此文件看模型的好坏
 
